@@ -70,7 +70,7 @@ export default async function ListingPage({
   params,
 }: {
   params: { listingId: string };
-}) {
+} & { searchParams: { [key: string]: string | string[] | undefined } }) {
   const listing = await getListingDetails(params.listingId);
 
   return (
