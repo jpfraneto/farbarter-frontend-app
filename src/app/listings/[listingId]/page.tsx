@@ -80,11 +80,15 @@ async function getListingDetails(listingId: string): Promise<ListingDetails> {
   }
 }
 
+interface GenerateMetadataProps {
+  params: {
+    listingId: string;
+  };
+}
+
 export async function generateMetadata({
   params,
-}: {
-  params: { listingId: string };
-}): Promise<Metadata> {
+}: GenerateMetadataProps): Promise<Metadata> {
   try {
     const listing = await getListingDetails(params.listingId);
     return {
@@ -125,13 +129,19 @@ function LoadingSkeleton() {
   );
 }
 
+interface ListingPageProps {
+  params: {
+    listingId: string;
+  };
+  searchParams?: {
+    [key: string]: string | string[] | undefined;
+  };
+}
+
 export default async function ListingPage({
   params,
   searchParams,
-}: {
-  params: { listingId: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}) {
+}: ListingPageProps) {
   try {
     console.log("the search params", searchParams);
     const listing = await getListingDetails(params.listingId);
