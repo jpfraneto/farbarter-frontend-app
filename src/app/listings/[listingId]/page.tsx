@@ -133,6 +133,7 @@ export default async function ListingPage({
   searchParams?: { [key: string]: string | string[] | undefined };
 }) {
   try {
+    console.log("the search params", searchParams);
     const listing = await getListingDetails(params.listingId);
 
     return (
