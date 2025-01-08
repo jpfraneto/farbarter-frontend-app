@@ -1,157 +1,257 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useState, useEffect } from "react";
+import { formatUnits } from "ethers";
+import ListingsGrid from "./ListingsGrid";
 
 interface Props {
   title?: string;
 }
 
+interface Listing {
+  id: number;
+  seller: string;
+  fid: number;
+  price: string;
+  remainingSupply: number;
+  metadata: string;
+  isActive: boolean;
+  totalSales: number;
+  imageUrl?: string;
+  sellerProfile?: {
+    username: string;
+    displayName: string;
+    pfp: string;
+  };
+}
+
 export default function Landing({ title = "farbarter" }: Props) {
-  const [showSellModal, setShowSellModal] = useState(false);
-  const [amount, setAmount] = useState("8");
-  const [qrCodeData, setQrCodeData] = useState("");
-  const [currentPaymentLink, setCurrentPaymentLink] = useState("");
-  const [copyButtonText, setCopyButtonText] = useState("Copy Link");
+  console.log("🚀 Launching Landing component...");
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
-  const showAmountPicker = () => {
-    setShowSellModal(true);
-    setQrCodeData("");
-  };
+  useEffect(() => {
+    console.log("🎯 Initial useEffect triggered");
+    fetchListings();
+  }, []);
 
-  const handleSell = async () => {
+  const fetchListings = async () => {
+    console.log("📋 Fetching listings...");
     try {
-      const uuid = crypto.randomUUID();
-      const response = await fetch(
-        "https://farcaster.anky.bot/daimo/create-sale",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            amount,
-            idempotencyKey: uuid,
-          }),
-        }
+      // Fetch listings from Ponder indexer
+      const response = await fetch("https://ponder.farbarter.com/listings");
+      const json_response = await response.json();
+      const listingsData = json_response.items;
+      console.log(listingsData);
+      console.log(
+        "📦 Raw listings data received:",
+        listingsData.length,
+        "items"
       );
 
-      const data: { paymentLink?: string } = await response.json();
+      // Get unique FIDs to fetch user profiles
+      const fids = [...new Set(listingsData.map((l: any) => l.fid))];
+      console.log("👥 Unique FIDs found:", fids.length);
 
-      if (data.paymentLink) {
-        setCurrentPaymentLink(data.paymentLink);
-        setQrCodeData(data.paymentLink);
-      } else {
-        alert("Error generating payment link. Please try again.");
-      }
+      // Fetch user profiles from Farcaster
+      const profilesResponse = await fetch(
+        `https://farcaster.anky.bot/farcaster/user/bulk?fids=${fids.join(",")}`
+      );
+      const json_profilesResponse = await profilesResponse.json();
+      const profilesData = json_profilesResponse.users;
+      console.log(profilesData);
+      console.log("👤 Profiles fetched:", profilesData.length);
+
+      // Fetch metadata for each listing
+      const enhancedListings = await Promise.all(
+        listingsData.map(async (listing: any) => {
+          try {
+            const metadataResponse = await fetch(
+              `https://anky.mypinata.cloud/ipfs/${listing.metadata}`
+            );
+            const metadata = await metadataResponse.json();
+            return {
+              ...listing,
+              imageUrl: metadata.imageUrl,
+              sellerProfile: profilesData.find(
+                (p: any) => p.fid === listing.fid
+              ),
+            };
+          } catch (error) {
+            console.error(
+              `Error fetching metadata for listing ${listing.id}:`,
+              error
+            );
+            return {
+              ...listing,
+              imageUrl: `https://picsum.photos/seed/${listing.id}/400/300`, // Fallback image
+              sellerProfile: profilesData.find(
+                (p: any) => p.fid === listing.fid
+              ),
+            };
+          }
+        })
+      );
+
+      console.log(enhancedListings);
+      console.log("✨ Enhanced listings created:", enhancedListings.length);
+
+      setListings(enhancedListings);
     } catch (error) {
-      console.error("Error in handleSell:", error);
-      alert("Error processing sale. Please try again.");
+      console.error("💥 Error fetching listings:", error);
+    } finally {
+      console.log("🏁 Finished loading listings");
+      setLoading(false);
     }
   };
 
-  const handleBuy = () => {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      alert(
-        "When someone clicks the sell button, they get a QR code. To pay that item, you need to scan that code with your phone's camera"
-      );
-    } else {
-      alert("You can only scan QR codes on a mobile device");
-    }
-  };
-
-  const copyPaymentLink = async () => {
-    try {
-      await navigator.clipboard.writeText(currentPaymentLink);
-      setCopyButtonText("Copied!");
-      setTimeout(() => {
-        setCopyButtonText("Copy Link");
-      }, 2000);
-    } catch (err) {
-      console.error("Failed to copy link:", err);
-      alert("Failed to copy link. Please try again.");
-    }
-  };
-
+  console.log("🎨 Rendering component with", listings.length, "listings");
   return (
-    <div className="min-h-screen bg-[#0f172a] text-[#f8fafc] relative font-['Space_Grotesk']">
-      <div className="min-h-screen flex flex-col items-center p-8 relative bg-[radial-gradient(circle_at_top_right,#6366f1_0%,transparent_60%),radial-gradient(circle_at_bottom_left,#ec4899_0%,transparent_60%)]">
-        <h1 className="text-6xl md:text-7xl font-bold my-8 bg-gradient-to-r from-[#f8fafc] to-[rgba(248,250,252,0.8)] bg-clip-text text-transparent tracking-tight drop-shadow-[0_0_30px_rgba(99,102,241,0.3)]">
+    <div className="min-h-screen bg-[#13111C] text-[#E2E8F0] relative font-['Space_Grotesk']">
+      <div className="min-h-screen flex flex-col items-center p-8 relative bg-[radial-gradient(circle_at_top_right,#7C3AED_0%,transparent_60%),radial-gradient(circle_at_bottom_left,#C084FC_0%,transparent_60%)]">
+        <h1 className="text-7xl md:text-8xl font-bold my-8 bg-gradient-to-r from-[#A855F7] via-[#7C3AED] to-[#6366F1] bg-clip-text text-transparent tracking-tight drop-shadow-[0_0_40px_rgba(124,58,237,0.5)] animate-pulse">
           {title}
         </h1>
 
-        <div className="w-full h-[2px] my-8 relative bg-gradient-to-r from-transparent via-[#6366f1] to-transparent">
-          <div className="absolute -top-[15px] left-0 right-0 h-[30px] bg-inherit blur-[20px] opacity-50"></div>
+        <h2 className="text-3xl text-center max-w-2xl mb-6 text-[#E2E8F0]/90">
+          The First On-Chain P2P Marketplace for Farcaster
+        </h2>
+
+        <p className="text-xl text-center max-w-2xl mb-12 text-[#E2E8F0]/80">
+          Trade anything, anywhere, with anyone – secured by smart contracts and
+          powered by your reputation.
+        </p>
+
+        {loading ? (
+          <div className="w-full max-w-6xl flex items-center justify-center mb-16">
+            <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-[#7C3AED]" />
+          </div>
+        ) : (
+          <ListingsGrid listings={listings} />
+        )}
+
+        <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+          <div className="bg-[#1A1625]/90 p-8 rounded-xl border border-[#7C3AED]">
+            <h3 className="text-2xl font-bold mb-4 text-[#A855F7]">
+              🤝 Sell With Confidence
+            </h3>
+            <p className="text-[#E2E8F0]/80">
+              List your digital goods, services, or collectibles in seconds.
+              Just tag @farbarterbot with your price and description. Our escrow
+              system ensures you get paid when the deal is done.
+            </p>
+          </div>
+
+          <div className="bg-[#1A1625]/90 p-8 rounded-xl border border-[#7C3AED]">
+            <h3 className="text-2xl font-bold mb-4 text-[#A855F7]">
+              🌈 Accept Any Payment
+            </h3>
+            <p className="text-[#E2E8F0]/80">
+              Buyers can pay with any token on any chain. You set your preferred
+              payment method, but stay flexible to capture more sales. Smart
+              contracts handle the complexity – you just get paid.
+            </p>
+          </div>
+
+          <div className="bg-[#1A1625]/90 p-8 rounded-xl border border-[#7C3AED]">
+            <h3 className="text-2xl font-bold mb-4 text-[#A855F7]">
+              ⚡ Lightning Fast Listings
+            </h3>
+            <p className="text-[#E2E8F0]/80">
+              No complicated forms. No lengthy approval process.
+              <br />
+              1. Tag @farbarterbot
+              <br />
+              2. Set your price
+              <br />
+              3. You're live!
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-8 my-8 w-full max-w-[800px] justify-center">
-          <button
-            onClick={showAmountPicker}
-            className="px-10 py-4 text-xl font-semibold rounded-2xl bg-[rgba(99,102,241,0.1)] text-[#f8fafc] cursor-pointer transition-all duration-300 backdrop-blur-[10px] border border-[rgba(99,102,241,0.2)] min-w-[200px] relative overflow-hidden hover:translate-y-[-2px] hover:bg-[rgba(99,102,241,0.2)] hover:shadow-[0_10px_20px_rgba(99,102,241,0.2)]"
-          >
-            sell
-          </button>
-          <button
-            onClick={handleBuy}
-            className="px-10 py-4 text-xl font-semibold rounded-2xl bg-[rgba(99,102,241,0.1)] text-[#f8fafc] cursor-pointer transition-all duration-300 backdrop-blur-[10px] border border-[rgba(99,102,241,0.2)] min-w-[200px] relative overflow-hidden hover:translate-y-[-2px] hover:bg-[rgba(99,102,241,0.2)] hover:shadow-[0_10px_20px_rgba(99,102,241,0.2)]"
-          >
-            buy
-          </button>
-        </div>
-
-        {showSellModal && (
-          <div className="fixed inset-0 bg-[rgba(15,23,42,0.9)] backdrop-blur-md flex justify-center items-center p-4 z-50">
-            <div className="bg-[#1e293b] rounded-3xl p-10 w-full max-w-[500px] border border-[#334155] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
-              {!qrCodeData ? (
-                <>
-                  <div className="flex items-center gap-4 mb-6">
-                    <input
-                      type="number"
-                      value={amount}
-                      onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        setAmount(e.target.value)
-                      }
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      className="w-full p-4 bg-[#334155] border border-white/10 rounded-xl text-[#f8fafc] text-base transition-all focus:outline-none focus:border-[#6366f1] focus:shadow-[0_0_0_2px_rgba(99,102,241,0.2)]"
-                    />
-                    <div className="text-xl font-semibold text-[#6366f1]">
-                      USDC
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleSell}
-                    className="w-full px-10 py-4 text-xl font-semibold rounded-2xl bg-[rgba(99,102,241,0.1)] text-[#f8fafc] cursor-pointer transition-all duration-300 backdrop-blur-[10px] border border-[rgba(99,102,241,0.2)] hover:bg-[rgba(99,102,241,0.2)] hover:shadow-[0_10px_20px_rgba(99,102,241,0.2)]"
-                  >
-                    sell
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="bg-white p-6 rounded-2xl w-fit mx-auto mb-6">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(
-                        qrCodeData
-                      )}`}
-                      alt="QR Code"
-                      className="w-64 h-64"
-                    />
-                  </div>
-                  <button
-                    onClick={copyPaymentLink}
-                    className="w-full p-3 bg-[#334155] text-[#f8fafc] border border-white/10 rounded-xl text-base cursor-pointer transition-all hover:bg-[#6366f1] hover:border-[#6366f1]"
-                  >
-                    {copyButtonText}
-                  </button>
-                </>
-              )}
+        <div className="w-full max-w-6xl mb-16">
+          <h2 className="text-3xl font-bold mb-8 text-center text-[#A855F7]">
+            🛡️ Built-in Protection
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-[#1A1625]/80 p-6 rounded-xl border border-[#7C3AED]">
+              <p className="text-center text-[#E2E8F0]">
+                Smart contract escrow
+              </p>
+            </div>
+            <div className="bg-[#1A1625]/80 p-6 rounded-xl border border-[#7C3AED]">
+              <p className="text-center text-[#E2E8F0]">Reputation scoring</p>
+            </div>
+            <div className="bg-[#1A1625]/80 p-6 rounded-xl border border-[#7C3AED]">
+              <p className="text-center text-[#E2E8F0]">Dispute resolution</p>
+            </div>
+            <div className="bg-[#1A1625]/80 p-6 rounded-xl border border-[#7C3AED]">
+              <p className="text-center text-[#E2E8F0]">
+                7-day safety timelock
+              </p>
             </div>
           </div>
-        )}
+        </div>
+
+        <div className="w-full max-w-6xl mb-16">
+          <h2 className="text-3xl font-bold mb-8 text-center text-[#A855F7]">
+            💫 Reputation Matters
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-[#1A1625]/90 p-8 rounded-xl border border-[#7C3AED]">
+              <h3 className="text-xl font-bold mb-4 text-[#E2E8F0]">
+                Build Trust Through Trading
+              </h3>
+              <ul className="space-y-2 text-[#E2E8F0]/80">
+                <li>• More visibility for your listings</li>
+                <li>• Access to premium features</li>
+                <li>• "Trusted Seller" badge</li>
+                <li>• Lower fees (coming soon)</li>
+              </ul>
+            </div>
+            <div className="bg-[#1A1625]/90 p-8 rounded-xl border border-[#7C3AED]">
+              <h3 className="text-xl font-bold mb-4 text-[#E2E8F0]">
+                True Ownership
+              </h3>
+              <ul className="space-y-2 text-[#E2E8F0]/80">
+                <li>• Your listings, your rules</li>
+                <li>• Keep full custody of your assets</li>
+                <li>• Choose your payment preferences</li>
+                <li>• Set your own terms</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-full max-w-4xl bg-[#1A1625]/90 p-8 rounded-xl border border-[#7C3AED] mb-16">
+          <h2 className="text-3xl font-bold mb-6 text-center text-[#A855F7]">
+            🚀 Getting Started
+          </h2>
+          <div className="space-y-4 text-center">
+            <p className="text-[#E2E8F0]/80">1. Have a Farcaster account</p>
+            <p className="text-[#E2E8F0]/80">
+              2. Tag @farbarterbot with what you want to sell
+            </p>
+            <p className="text-[#E2E8F0]/80">3. Set your price in USDC</p>
+            <p className="text-[#E2E8F0]/80">4. Share with your audience!</p>
+          </div>
+        </div>
+
+        <div className="text-center max-w-2xl mb-12">
+          <h2 className="text-3xl font-bold mb-4 text-[#A855F7]">
+            Ready to Start Trading?
+          </h2>
+          <p className="text-xl text-[#E2E8F0]/90 mb-6">
+            Tag @farbarterbot in a cast with what you want to sell. Join the
+            fastest-growing P2P marketplace in the Farcaster ecosystem.
+          </p>
+          <p className="text-[#E2E8F0]/70 italic">
+            *Powered by smart contracts. Protected by reputation. Built for
+            you.*
+          </p>
+        </div>
       </div>
     </div>
   );
