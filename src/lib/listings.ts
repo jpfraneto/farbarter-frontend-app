@@ -71,6 +71,7 @@ export async function getListingDetails(
       preferredChain: Number(details[8]),
     };
   } catch (error) {
+    console.error("Error fetching listing details:", error);
     if (error instanceof Error) {
       throw new Error(`Failed to fetch listing details: ${error.message}`);
     }
@@ -87,6 +88,7 @@ async function fetchMetadataFromIpfs(
     );
     return response.data;
   } catch (error) {
+    console.error("Error fetching metadata from IPFS:", error);
     throw new Error("Failed to fetch metadata from IPFS");
   }
 }

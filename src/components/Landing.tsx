@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatUnits } from "ethers";
 import ListingsGrid from "./ListingsGrid";
 
 interface Props {
@@ -25,12 +24,28 @@ interface Listing {
   };
 }
 
+interface ListingData {
+  id: number;
+  seller: string;
+  fid: number;
+  price: string;
+  remainingSupply: number;
+  metadata: string;
+  isActive: boolean;
+  totalSales: number;
+}
+
+interface ProfileData {
+  fid: number;
+  username: string;
+  displayName: string;
+  pfp: string;
+}
+
 export default function Landing({ title = "farbarter" }: Props) {
   console.log("🚀 Launching Landing component...");
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
 
   useEffect(() => {
     console.log("🎯 Initial useEffect triggered");
@@ -43,7 +58,7 @@ export default function Landing({ title = "farbarter" }: Props) {
       // Fetch listings from Ponder indexer
       const response = await fetch("https://ponder.farbarter.com/listings");
       const json_response = await response.json();
-      const listingsData = json_response.items;
+      const listingsData = json_response.items as ListingData[];
       console.log(listingsData);
       console.log(
         "📦 Raw listings data received:",
@@ -52,7 +67,7 @@ export default function Landing({ title = "farbarter" }: Props) {
       );
 
       // Get unique FIDs to fetch user profiles
-      const fids = [...new Set(listingsData.map((l: any) => l.fid))];
+      const fids = [...new Set(listingsData.map((l) => l.fid))];
       console.log("👥 Unique FIDs found:", fids.length);
 
       // Fetch user profiles from Farcaster
@@ -60,13 +75,13 @@ export default function Landing({ title = "farbarter" }: Props) {
         `https://farcaster.anky.bot/farcaster/user/bulk?fids=${fids.join(",")}`
       );
       const json_profilesResponse = await profilesResponse.json();
-      const profilesData = json_profilesResponse.users;
+      const profilesData = json_profilesResponse.users as ProfileData[];
       console.log(profilesData);
       console.log("👤 Profiles fetched:", profilesData.length);
 
       // Fetch metadata for each listing
       const enhancedListings = await Promise.all(
-        listingsData.map(async (listing: any) => {
+        listingsData.map(async (listing: ListingData) => {
           try {
             const metadataResponse = await fetch(
               `https://anky.mypinata.cloud/ipfs/${listing.metadata}`
@@ -75,9 +90,7 @@ export default function Landing({ title = "farbarter" }: Props) {
             return {
               ...listing,
               imageUrl: metadata.imageUrl,
-              sellerProfile: profilesData.find(
-                (p: any) => p.fid === listing.fid
-              ),
+              sellerProfile: profilesData.find((p) => p.fid === listing.fid),
             };
           } catch (error) {
             console.error(
@@ -87,9 +100,7 @@ export default function Landing({ title = "farbarter" }: Props) {
             return {
               ...listing,
               imageUrl: `https://picsum.photos/seed/${listing.id}/400/300`, // Fallback image
-              sellerProfile: profilesData.find(
-                (p: any) => p.fid === listing.fid
-              ),
+              sellerProfile: profilesData.find((p) => p.fid === listing.fid),
             };
           }
         })
@@ -109,7 +120,7 @@ export default function Landing({ title = "farbarter" }: Props) {
 
   console.log("🎨 Rendering component with", listings.length, "listings");
   return (
-    <div className="min-h-screen bg-[#13111C] text-[#E2E8F0] relative font-['Space_Grotesk']">
+    <div className="min-h-screen bg-[#13111C] text-[#E2E8F0] relative font-[Space_Grotesk]">
       <div className="min-h-screen flex flex-col items-center p-8 relative bg-[radial-gradient(circle_at_top_right,#7C3AED_0%,transparent_60%),radial-gradient(circle_at_bottom_left,#C084FC_0%,transparent_60%)]">
         <h1 className="text-7xl md:text-8xl font-bold my-8 bg-gradient-to-r from-[#A855F7] via-[#7C3AED] to-[#6366F1] bg-clip-text text-transparent tracking-tight drop-shadow-[0_0_40px_rgba(124,58,237,0.5)] animate-pulse">
           {title}
@@ -166,7 +177,7 @@ export default function Landing({ title = "farbarter" }: Props) {
               <br />
               2. Set your price
               <br />
-              3. You're live!
+              3. You&apos;re live!
             </p>
           </div>
         </div>
@@ -207,7 +218,7 @@ export default function Landing({ title = "farbarter" }: Props) {
               <ul className="space-y-2 text-[#E2E8F0]/80">
                 <li>• More visibility for your listings</li>
                 <li>• Access to premium features</li>
-                <li>• "Trusted Seller" badge</li>
+                <li>• &quot;Trusted Seller&quot; badge</li>
                 <li>• Lower fees (coming soon)</li>
               </ul>
             </div>
